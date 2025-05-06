@@ -1,0 +1,55 @@
+clear;
+% 
+% c=parcluster('local');
+% c.NumWorkers= 6;
+% parpool(6);
+
+
+addpath('generatedata\')
+addpath('pmcmc\')
+addpath('helpers\')
+addpath(genpath('gpml-matlab-v3.1-2010-09-27'))
+addpath(genpath('No_Identifiability_gmle'))
+
+N= 400 ;
+par.finalTime       = 400*2;            % Data length
+par.resampling      = 3;               % 1 - multinom, 2 - systematic, 3 - stratified
+par.Np              = 15;              % Number of particles
+par.numMCMC         = 25000;           % Number of MCMC iterations
+par.burnin = 5000;                     % MCMC burnin. Also, stops rescaling after this many iterations.
+par.input           = 1;               % Use this to indicate whether or not we should use an input signal when generating data
+par.scaling         = 'h2';            % How to resolve the scale ambiguity, either 'range', 'H2' or 'none'
+par.dynprior        = 'ard';          
+par.ardnx           = 10;   
+[sys0, data] = testsystem_wienergp_4d(par.finalTime, par);
+snr = var(data.e')/var(data.y'-data.e')
+
+% sys0.H2 = cmpH2norm(sys0.ss.A, sys0.ss.B, sys0.ss.C, sys0.ss.Q, 0);
+% 
+% par.plotON      = 1;
+% par.save        = 0;
+% identify_wienergp(sys0,data,par);
+
+
+M = 2;
+
+n = 100;
+EstInfo = rvs_ml([data.u(1:N)',data.y(1:N)'], n, M, 'DC-bd', 'chol');
+hyper = EstInfo.hp;
+h0 = EstInfo.h0;
+W  = EstInfo.W;
+ye = EstInfo.yhat;
+cost = EstInfo.cost;
+sigsqr = EstInfo.sigsqr;
+ytrue = data.y'-data.e';
+efit = gof(ytrue(n:N),ye);
+Psi = EstInfo.Psi;
+Ov = CalculateOutputKernel(CalculatePsi(data.u(N+1:2*N)',n), Psi, M, 'DC-bd', hyper, 0);
+yp = Ov*W + h0;
+pfit = gof(ytrue(N+n:2*N),yp)
+
+
+
+plot(ytrue); hold on;
+plot([zeros(n,1);ye;zeros(n,1);yp]); grid on;
+legend('TRUE','ESTIMATE')

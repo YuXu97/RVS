@@ -1,0 +1,49 @@
+
+PFIT_vs = [];
+NFIT_vs = [];
+GFIT_vs = [];
+for i = 1:40
+   dp = load(['Results/6dsys/vs/PFIT_vs_' int2str(i) '.mat']);
+   dg = load(['Results/6dsys/vs/GFIT_vs_' int2str(i) '.mat']);
+   dn = load(['Results/6dsys/vs/NFIT_vs_' int2str(i) '.mat']);
+   PFIT_vs = [PFIT_vs; dp.pfit];
+   GFIT_vs = [GFIT_vs; dg.gfit];
+   NFIT_vs = [NFIT_vs; dn.nfit];
+end
+
+PFIT_gp = [];
+NFIT_gp = [];
+GFIT_gp = [];
+for i = 1:40
+   dp = load(['Results/6dsys/gp/PFIT_gp_' int2str(i) '.mat']);
+   dg = load(['Results/6dsys/gp/GFIT_gp_' int2str(i) '.mat']);
+   dn = load(['Results/6dsys/gp/NFIT_gp_' int2str(i) '.mat']);
+   PFIT_gp = [PFIT_gp; dp.pfit];
+   GFIT_gp = [GFIT_gp; dg.gfit];
+   NFIT_gp = [NFIT_gp; dn.nfit];
+end
+
+
+dp = load(['Results/6dsys/nlwh/PFIT_nlwh.mat']);
+dg = load(['Results/6dsys/nlwh/GFIT_nlwh.mat']);
+dn = load(['Results/6dsys/nlwh/NFIT_nlwh.mat']);
+
+PFIT_nlwh = dp.PFIT_nlwh;
+GFIT_nlwh = dg.GFIT_nlwh;
+NFIT_nlwh = dn.NFIT_nlwh;
+
+subplot(3,1,1)
+%pfit plotting
+nice_boxplot([PFIT_vs,PFIT_gp,PFIT_nlwh],0,100,{'RVS','SEMIP+ARD','PEM+HOCV'},'PFit','',0)
+mean([PFIT_vs,PFIT_gp,PFIT_nlwh])
+
+subplot(3,1,2)
+%gfit plotting
+nice_boxplot([GFIT_vs,GFIT_gp,GFIT_nlwh],0,100,{'RVS','SEMIP+ARD','PEM+HOCV'},'GFit','',0)
+mean([GFIT_vs,GFIT_gp,GFIT_nlwh])
+
+subplot(3,1,3)
+%nfit plotting
+nice_boxplot([NFIT_vs,NFIT_gp,NFIT_nlwh],0,100,{'RVS','SEMIP+ARD','PEM+HOCV'},'NFit','',0)
+mean([NFIT_vs,NFIT_gp,NFIT_nlwh])
+

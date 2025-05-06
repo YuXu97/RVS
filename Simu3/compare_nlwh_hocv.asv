@@ -1,0 +1,55 @@
+clear;
+
+addpath('generatedata/')
+% c=parcluster('local');
+% c.NumWorkers= 3;
+% parpool(3);
+
+
+Maxrepi = 1;
+N = 200;
+n = 80;
+
+PFIT_nlwh = [];
+
+for repi = 1:Maxrepi
+    fprintf('repi = %i: \n',repi);
+    d = load(['databank/' 'data_' int2str(repi) '.mat']);
+    data = [d.data.u(1:N)',d.data.y(1:N)'];
+    data = flip(data,2);
+
+    %hold out cross validation
+    order = 2:20;
+    order_pl = 1:10;
+    err = zeros(length(order), length(order_pl));
+    for iter = 1:length(order)
+        ord = order(iter);
+        for iter_pl = 1:length(order_pl)
+            ord_pl = order_pl(iter_pl);
+
+            ORDs = [ord ord 1];
+            pl = idPolynomial1D('Degree', ord_pl);
+            sys = nlhw(data, ORDs, [], pl);
+            y_nlhw = sim(sys, [d.data.u'; d.data.uv']);
+            err(iter,iter_pl) = sumsqr(y_nlhw(N+1:2*N) - d.data.yv');
+            %gof(d.data.yvtrue, y_nlhw)
+        end 
+    end
+
+    [~, min_id] = min(err(:));
+    [id_opt, id_opt_pl] = ind2sub([iter,iter_pl], min_id);
+    order_opt = order(id_opt);
+    order_opt_pl = order_pl(id_opt_pl);
+
+    pl_opt =idPolynomial1D('Degree',order_opt_pl);
+    ORD_opt = [order_opt,order_opt,1];
+
+    data_est = [[d.data.u d.data.uv]',[d.data.y d.data.yv]'];
+    data_est = flip(data_est,2);
+    sys_opt = nlhw(data_est, ORD_opt, [], pl_opt);
+    y_nlhw_opt = sim(sys_opt, d.data.ut');
+    PFIT_nlwh = [PFIT_nlwh, gof(d.data.yttrue(n:end), y_nlhw_opt(n:end))];
+    fprintf('Completed\n');
+end
+
+% save('Results/nlwh/PFIT_nlwh.mat','PFIT_nlwh');

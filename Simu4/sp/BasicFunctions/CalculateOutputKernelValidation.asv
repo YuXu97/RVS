@@ -1,0 +1,101 @@
+function [Ov] = CalculateOutputKernelValidation(Psiv, Psi, M, kernel, hyper)
+
+[N1,n] = size(Psiv);
+[N2,~] = size(Psi);
+Ov = zeros(N1,N2);
+switch kernel
+
+    case 'TC-bd'
+        c = exp(hyper(1:M));
+        lam = hyper(M+1);
+        U = lam.^(1:n)'; V = ones(n,1);
+        K = tril(U*V')+triu(V*U',1);
+        for m = 1:M
+            Ov = Ov + c(m)*(Psiv*K*Psi').^m;
+        end
+
+
+    case 'DC-bd'
+        c = exp(hyper(1:M));
+        lam = hyper(M+1); rho = hyper(M+2);
+        U = (lam*rho).^(1:n)'; V = (lam/rho).^(1:n)';
+        K = tril(U*V')+triu(V*U',1);
+        for m = 1:M
+            Ov = Ov + c(m)*(Psiv_ir*K*Psi_ir').^m;
+        end
+
+    case 'TC-tc'
+        c = hyper(1:M).^3;
+        lam = hyper(M+1);
+        U = lam.^(1:n)'; V = ones(n,1);
+        K = tril(U*V')+triu(V*U',1);
+        Otmp = Psiv*K*Psi';
+        for m = 1:M
+            Ov = Ov + c(m)^2*Otmp.^m;
+        end
+
+        zeta = lam.^(1:n)';
+        XI1 = Psiv*zeta*ones(1,N2);
+        XI2 = Psi*zeta*ones(1,N1);
+        for i = 1:M
+            for j = i+1:M
+                Ov = Ov + c(i)*c(j)*(Otmp.^i).*((XI2.^(j-i))'+(XI1.^(j-i)));
+            end
+        end
+
+    case 'DC-dc'
+        c = hyper(1:M).^3;
+        lam = hyper(M+1); rho = hyper(M+2);
+        U = (lam*rho).^(1:n)'; V = (lam/rho).^(1:n)';
+        K = tril(U*V')+triu(V*U',1);
+        Otmp = Psiv*K*Psi';
+        for m = 1:M
+            Ov = Ov + c(m)^2*Otmp.^m;
+        end
+
+        zeta = (lam*rho).^(1:n)';
+        XI1 = Psiv*zeta*ones(1,N2);
+        XI2 = Psi*zeta*ones(1,N1);
+        for i = 1:M
+            for j = i+1:M
+                Ov = Ov + c(i)*c(j)*(Otmp.^i).*((XI2.^(j-i))'+(XI1.^(j-i)));
+            end
+        end
+
+    case 'DC-bd-sp'
+        c = exp(hyper(1:M));
+        lam = hyper(M+1); rho = 0.999;
+        K =zeros(N1,N2);
+        for i = 1:N1
+            for j = 1:N2
+                K(i,j) = lam^(i+j)*rho^abs(i-j);
+            end
+        end
+        for m = 1:M
+            Ov = Ov + c(m)*(Psiv_ir*K*Psi_ir').^m;
+        end
+        
+    case 'DC-dc-sp'
+        c = hyper(1:M).^3;
+        lam = hyper(M+1); rho = 0.999;
+        K =zeros(N1,N2);
+        for i = 1:N1
+            for j = 1:N2
+                K(i,j) = lam^(i+j)*rho^abs(i-j);
+            end
+        end
+        Otmp = Psiv_ir*K*Psi_ir';
+        for m = 1:M
+            Ov = Ov + c(m)^2*Otmp.^m;
+        end
+
+        zeta1 = (lam*rho).^(1:N1)';
+        zeta2 = (lam*rho).^(1:N2)';
+        XI1 = Psiv_ir*zeta1*ones(1,Nd2);
+        XI2 = Psi_ir*zeta2*ones(1,Nd1);
+        for i = 1:M
+            for j = i+1:M
+                Ov = Ov + c(i)*c(j)*(Otmp.^i).*((XI2.^(j-i))'+(XI1.^(j-i)));
+            end
+        end
+end

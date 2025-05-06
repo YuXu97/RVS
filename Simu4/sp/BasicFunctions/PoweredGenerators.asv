@@ -1,0 +1,35 @@
+function [P,Q] = PoweredGenerators(U,V,m)
+%This function returns the generators of (U*V).^m
+[N,r] = size(U);
+C = MultiPermuations(m,r);
+[num_gen,~] = size(C);
+
+Ua = zeros(r*N,m+1);
+Va = zeros(r*N,m+1);
+
+tmpu = ones(N*r,1);
+tmpv = ones(N*r,1);
+uvec = U(:);
+vvec = V(:);
+for i = 0:m
+    Ua(:,i+1) = tmpu;
+    Va(:,i+1) = tmpv;
+    tmpu = tmpu.*uvec;
+    tmpv = tmpv.*vvec;
+end
+
+P = zeros(N,num_gen);
+Q = zeros(N,num_gen);
+for i = 1:num_gen
+    p = ones(N,1);
+    q = ones(N,1);
+    for j = 1:r
+        p = p.*(U(:,j).^C(i,j));
+        q = q.*(V(:,j).^C(i,j));
+    end
+    
+    P(:,i) = multinomial(m,C(i,:))*p;
+    Q(:,i) = q;
+end
+
+end

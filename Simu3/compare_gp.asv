@@ -1,0 +1,86 @@
+clear;
+Maxrepi = 1;
+% c=parcluster('local');
+% c.NumWorkers= 75;
+% parpool(75);
+
+addpath('generatedata/')
+addpath('pmcmc/')
+addpath('helpers/')
+addpath(genpath('gpml-matlab-v3.1-2010-09-27'))
+
+n = 80;
+N = 200;
+
+par.finalTime       = N;            % Data length
+par.resampling      = 3;               % 1 - multinom, 2 - systematic, 3 - stratified
+par.Np              = 15;              % Number of particles
+par.numMCMC         = 20000;           % Number of MCMC iterations
+par.burnin = 10000;                     % MCMC burnin. Also, stops rescaling after this many iterations.
+par.input           = 1;               % Use this to indicate whether or not we should use an input signal when generating data
+par.scaling         = 'h2'; %'h2';            % How to resolve the scale ambiguity, either 'range', 'H2' or 'none'
+
+%
+par.dynprior        = 'minw';
+
+
+
+par.plotON      = 0;
+par.save        = 0;
+
+for repi = 1:Maxrepi
+    d = load(['databank/' 'data_' int2str(repi) '.mat']);
+    s = load(['databank/' 'sys0_' int2str(repi) '.mat']);
+    s.sys0.H2 = cmpH2norm(s.sys0.ss.A, s.sys0.ss.B, s.sys0.ss.C, s.sys0.ss.Q, 0);
+
+
+    break_flag = 0;
+    iter_count = 0;
+    order = 2:20;
+    err = zeros(length(order),1);
+    for itero = 1:length(order)
+        par.ardnx  = order(itero);
+        [A,B,C,h] = identify_wienergp(s.sys0,d.data,par);
+
+        yhat = zeros(2*N,1);
+        for iter = 1:par.numMCMC - par.burnin
+            Ai = A(:,:,iter);
+            Bi = B(:,:,iter);
+            ht = h(iter);
+            htt = ht{:};
+
+            sys_est = ss(Ai,Bi,C,0,1);
+
+            z = lsim(sys_est, [d.data.u'; d.data.uv'], 1:2*N);
+
+            warning off
+            yhat = yhat + htt(z)';
+        end
+        yhat = yhat/(par.numMCMC - par.burnin);
+        err(iter) = sumsqr(yhat(N+1:2*N)-d.data.yv');
+    end
+    [~, min_id] = min(err(:));
+    order_opt = order(min_id);
+    par.finalTime = 2*N; 
+    par.ardnx  = order(order_opt);
+    d_opt = d;
+    d_opt.data.u = [d.data.u, d.data.uv];
+    d_opt.data.y = [d.data.y, d.data.yv];
+    [A,B,C,h] = identify_wienergp(s.sys0, d_opt.data, par);
+    yhat = zeros(2*N,1);
+        for iter = 1:par.numMCMC - par.burnin
+            Ai = A(:,:,iter);
+            Bi = B(:,:,iter);
+            ht = h(iter);
+            htt = ht{:};
+
+            sys_est = ss(Ai,Bi,C,0,1);
+
+            z = lsim(sys_est, [d.data.u'; d.data.uv'], 1:2*N);
+
+            warning off
+            yhat = yhat + htt(z)';
+        end
+        yhat = yhat/(par.numMCMC - par.burnin);
+end
+gof(d.data.yv',yhat(N+1:2*N))

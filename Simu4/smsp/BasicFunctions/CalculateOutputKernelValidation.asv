@@ -1,0 +1,56 @@
+function [Ov] = CalculateOutputKernelValidation(Psiv_ir, Psi_ir, M, kernel, hyper)
+
+[Nd1,N1] = size(Psiv_ir);
+[Nd2,N2] = size(Psi_ir);
+Ov = zeros(Nd1,Nd2);
+switch kernel
+
+    case 'TC-bd'
+        c(1:M) = exp(hyper(1:M));
+        lam = hyper(M+1);
+        K =zeros(N1,N2);
+        for i = 1:N1
+            for j = 1:N2
+                K(i,j) = lam^max(i,j);
+            end
+        end
+        for m = 1:M
+            Ov = Ov + c(m)*(Psiv_ir*K*Psi_ir').^m;
+        end
+
+
+    case 'DC-bd'
+        c(1:M) = exp(hyper(1:M));
+        lam = hyper(M+1); rho = hyper(M+2);
+        K =zeros(N1,N2);
+        for i = 1:N1
+            for j = 1:N2
+                K(i,j) = lam^(i+j)*rho^abs(i-j);
+            end
+        end
+        for m = 1:M
+            Ov = Ov + c(m)*(Psiv_ir*K*Psi_ir').^m;
+        end
+
+    case 'TC-tc'
+        c(1:M) = hyper(1:M).^3;
+        lam = hyper(M+1);
+        K =zeros(N1,N2);
+        for i = 1:N1
+            for j = 1:N2
+                K(i,j) = lam^max(i,j);
+            end
+        end
+        for m = 1:M
+            Ov = Ov + c(m)*(Psiv_ir*K*Psi_ir').^m;
+        end
+
+
+        for i = 1:M
+            for j = i+1:M
+                TMP = ((Psiv_ir*K*Psi_ir').^i).*(XI.^(j-i));
+                Ov = Ov + pc(i)*pc(j)*(TMP+TMP');
+            end
+        end
+        
+end

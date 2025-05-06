@@ -1,0 +1,125 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%README%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                           Nmid
+%Data: |-------N points------||------Nv points-----|
+%      <------training-------><----validation------>                                
+%
+%
+%Methods: {'svd','chol','combined'} --> methods to calculate the inverse of O+sig^2 I
+%        
+%Kernels: --> kernels designed for Volterra kernels
+%full order: {'TC_cmn','TC_idv','DC_cmn','DC_idv','TC_poly','DC_poly','DC_mpoly'}   ---> full/baseline model
+%single order: {'TC','DC', 'SE', 'TC_2sum'}                                         ---> error model
+%
+%M: model order, 
+%N: training data number, 
+%Nv: validation data number,
+%n: memory length, 
+%ke: output divided by 10^ke to mitigate numerical issues.
+%mode: mode = {'error', wc, ph}, where wc, ph are the estimated carrier
+%      frequency and phase from the baseline model, respectively. ---> error model
+%      mode = {'full',[],[]}.                                     ---> full/baseline model
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%README%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%=> This demo is to train a linear baseline model (M = 1) or directly train the
+%=> full model (M > 1). 
+%=> If it is used to train a baseline model, make sure
+%=> to save ye (estimated output), yp (predicted output), wc (estimated carrier frequency) 
+%=> and ph (estimated carrier phase) by saving the result for the subsequent error model training.
+
+clear;
+addpath([pwd '/BasicFunctions']);
+addpath([pwd '/TuningMethods']);
+
+M = 2; n = 20;
+N = 300;
+Maxrepi = 50;
+
+for repi = 1:Maxrepi
+    data_generation(N, n, {'white',[0,1]}, 0.95, 'gauss', repi);
+end
+
+Efit = zeros(2, Maxrepi);
+Costs = zeros(2, Maxrepi);
+for repi = 1:Maxrepi
+
+d = load(['Databank/data_N' int2str(N) '_repi=0.mat']);
+data = d.datainfo.data;
+
+%--------------------------------training----------------------------------%
+kernel = {'DC_poly','DC_mpoly'}; method = 'svd';
+
+
+tic;
+EstInfo_poly = rvs_ml(data, n, M, kernel{1}, method);
+EstInfo_mpoly = rvs_ml(data, n, M, kernel{2}, method);
+toc;
+
+ytrue = d.datainfo.ytrue(n+1:N);
+
+
+hyper_poly = EstInfo_poly.hp;
+ye_poly = EstInfo_poly.yhat;
+W_poly  = EstInfo_poly.W;
+cost_poly = EstInfo_poly.cost; 
+Psit_poly = EstInfo_poly.Psi;
+efit_poly = gof(ytrue,ye_poly);
+Efit(1,repi) = efit_poly;
+Costs(1,repi) = cost_poly;
+
+hyper_mpoly = EstInfo_mpoly.hp;
+ye_mpoly = EstInfo_mpoly.yhat;
+W_mpoly  = EstInfo_mpoly.W;
+cost_mpoly = EstInfo_mpoly.cost; 
+Psit_mpoly = EstInfo_mpoly.Psi;
+efit_mpoly = gof(ytrue,ye_mpoly);
+Efit(2,repi) = efit_mpoly;
+Costs(2,repi) = cost_mpoly;
+
+%----------------------------printing & saving-----------------------------%
+% fprintf('--------------repi = %i----------------\n',repi);
+% fprintf('DC_poly\n');
+% fprintf('Estimation Fit = %.4f\n', efit_poly);
+% fprintf('ML cost = %.4g\n', cost_poly);
+% % fprintf('HyperParameters = ');
+% % for i = 1:length(hyper)
+% %     fprintf('%.4f ', hyper(i));
+% % end
+% fprintf('\n');
+% fprintf('------------------------------------\n');
+% 
+% fprintf('DC_mpoly\n');
+% fprintf('Estimation Fit = %.4f\n', efit_mpoly);
+% fprintf('ML cost = %.4g\n', cost_mpoly);
+% % fprintf('HyperParameters = ');
+% % for i = 1:length(hyper)
+% %     fprintf('%.4f ', hyper(i));
+% % end
+% fprintf('\n');
+% fprintf('------------------------------------\n');
+
+
+% plot(1:N-n,ye);
+% hold on;
+% plot(1:N-n,ytrue);
+% grid on;
+% legend('estimate','true');
+
+result.Settings.N_training = N;
+result.Settings.n = n;
+result.Settings.M = M;
+result.Settings.method = method;
+
+
+result.poly.Training.hyperparameters = hyper_poly;
+result.poly.Training.cost = cost_poly;
+result.poly.Training.estimated_output = ye_poly;
+result.poly.Training.estimation_fit = efit_poly;
+
+result.mpoly.Training.hyperparameters = hyper_mpoly;
+result.mpoly.Training.cost = cost_mpoly;
+result.mpoly.Training.estimated_output = ye_mpoly;
+result.mpoly.Training.estimation_fit = efit_mpoly;
+
+
+save([pwd '/Results/' int2str(repi) '.mat'], 'result');
+end

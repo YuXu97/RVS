@@ -1,0 +1,108 @@
+clear;
+addpath('generatedata/')
+addpath(genpath('Identifiability'))
+% 
+% c=parcluster('local');
+% c.NumWorkers= 80;
+% parpool(80);
+
+
+Maxrepi = 40;
+N = 250; 
+n= 100;
+
+PFIT_vs = [];
+NFIT_vs = [];
+GFIT_vs = [];
+COST_vs = [];
+kernel = 'SI2od_dc-bd'; %'DC-bd'
+% list = [1     2     8    11    21    26    27    34    37    40];
+for repi = 1:Maxrepi %kkk = 1:length(list)%
+%     repi = list(kkk);
+    fprintf('repi = %i: \n',repi);
+    d = load(['databank/final_delay/' 'data_' int2str(repi) '.mat']);
+    data = [d.data.u(1:N)',d.data.y(1:N)'];
+
+    %hold out cross validation
+%     order_pl = 2;
+%     err = zeros(length(order_pl),1);
+
+%     for iter_pl = 1:length(order_pl)
+%         ord_pl = order_pl(iter_pl);
+%         EstInfo = rvs_ml(data, n, ord_pl, 'DC-bd', 'chol');
+%         hyper = EstInfo.hp;
+%         h0 = EstInfo.h0;
+%         W  = EstInfo.W;
+%         Psi = EstInfo.Psi;
+%         Ov = CalculateOutputKernel(CalculatePsi(d.data.uv',n), Psi, ord_pl, 'DC-bd', hyper, 0);
+%         yp = Ov*W + h0;
+%         err(iter_pl) = sumsqr(yp - d.data.yv(n:end)');
+%     end
+%     [~, min_id] = min(err(:));
+%     order_opt_pl = order_pl(min_id);
+
+    order_opt_pl = 9;
+    data_est = [[d.data.u d.data.uv]',[d.data.y d.data.yv]'];
+    EstInfo_opt = rvs_ml(data_est, n, order_opt_pl, kernel, 'chol');
+    
+    
+    ye = EstInfo_opt.yhat;
+    hyper = EstInfo_opt.hp;
+    poly = hyper(1:order_opt_pl);
+    h0 = EstInfo_opt.h0;
+    b = EstInfo_opt.b;
+    W  = EstInfo_opt.W;
+    Psi = EstInfo_opt.Psi;
+    cost = EstInfo_opt.cost;
+    ghat = EstInfo_opt.ghat;
+
+    Ov = CalculateOutputKernel(CalculatePsi_delay(d.data.ut',n), Psi, order_opt_pl, kernel, hyper, 0);
+    %yt = Ut*W + h0
+    Bv = zeros(2*N-n+1,order_opt_pl);
+    for i = 1:order_opt_pl
+        Bv(:,i) = d.data.ut(n-1:2*N-1).^i;
+    end
+    bv = Bv*poly;
+    yt = Ov*W + hyper(end-1) + bv;
+    %         yt = Ov*W + bv;
+
+    
+    
+    efit = gof([d.data.ytrue(n:end) d.data.yvtrue]',ye);
+    pfit = gof(d.data.yttrue(n:end)', yt);
+    
+    
+    gtrue = d.data.gtrue(1:n);
+    gfit = gof(gtrue,ghat*gtrue(2));
+     
+    xx = (-1.5:1e-2:1.5)';
+    
+    re1 = d.data.nonl(xx);
+    
+    re2 = zeros(length(xx),1);
+    for i = 1:order_opt_pl
+        re2 = re2 + poly(i)*((xx/gtrue(2)).^i);
+    end
+          
+    re2 = re2 + h0;
+    nfit = gof(re1,re2);
+
+    COST_vs = [COST_vs, cost];
+    fprintf('Completed\n');  
+    s = struct('pfit',pfit);
+    save(sprintf('Results/6dsys/vs/PFIT_vs_%d.mat',repi),'-fromstruct',s);
+    
+    sp = struct('gfit',gfit);
+    save(sprintf('Results/6dsys/vs/GFIT_vs_%d.mat',repi),'-fromstruct',sp);
+    
+    sn = struct('nfit',nfit);
+    save(sprintf('Results/6dsys/vs/NFIT_vs_%d.mat',repi),'-fromstruct',sn);
+
+%      save('Results/MC/VS/PFIT_vs.mat','PFIT_vs');
+%      save('Results/MC/VS/COST_vs.mat','COST_vs');
+%     save('Results/4dsys/vs/PFIT_vs.mat','PFIT_vs');
+%     save('Results/4dsys/vs/COST_vs.mat','COST_vs');
+%      save('Results/6dsys/vs/PFIT_vs.mat','PFIT_vs');
+%      save('Results/6dsys/vs/COST_vs.mat','COST_vs');
+end
+   
